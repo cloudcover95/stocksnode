@@ -13,4 +13,6 @@ a predictive matrix mesh data orchestrator quant brain - stock market focus atm
 Proprietary R&D Architecture | Autonomous Market Robot (AMR) Infrastructure
 License: MIT License (Open-Core) / Commercial Use Subject to LLC Trademark
 Framework Tags: [Python 3.9+] [NumPy Native] [SQLite] [Web3.py] [WASM-Ready]
+
+https://buymeacoffee.com/cloudnjr?new=1
 ===========================================================================
