@@ -1,19 +1,24 @@
+"""
+JuniorCloud LLC // Web3Node Namespace
+Exposes Agent Levers for autonomous inference.
+"""
 from .financial_tensor import Web3FinancialTensor
-from .llm_bridge import LocalLLMBridge
 
-class SovereignAgentInterface:
-    """
-    The 'Lever' for AI Agents. 
-    Exposes simplified logic gates for autonomous decision making.
-    """
+class SovereignAgentLever:
     def __init__(self):
-        self.math = Web3FinancialTensor()
-        self.bridge = LocalLLMBridge()
+        self.kernel = Web3FinancialTensor()
 
-    def get_alpha_signal(self, H, L, C):
-        """Collapses the 5D manifold into a single actionable string for an LLM."""
-        state = self.math.process_financial_manifold(H, L, C)
-        # Returns a 'Human-Readable' state for LLM injection
-        return f"Z:{state['z_score'][-1]:.2f} | Q:{state['q_mark'][-1]:.2f} | Liq:{state['turtle_alignment'][-1]:.2f}"
+    def collapse_state(self, H, L, C):
+        """
+        Collapses the manifold into a logic-dense prompt fragment.
+        Inference: If Q_Mark > 0.85, Action is confirmed.
+        """
+        data = self.kernel.process_financial_manifold(H, L, C)
+        q = data["q_mark"][-1]
+        z = data["z_score"][-1]
+        align = data["turtle_alignment"][-1]
+        
+        status = "CRITICAL_BREAKOUT" if q > 0.85 and z > 2.0 else "SUPERPOSITION"
+        return f"STATE: {status} | Q: {q:.4f} | Z: {z:.2f} | LIQ: {align:.2f}"
 
-__all__ = ["Web3FinancialTensor", "LocalLLMBridge", "SovereignAgentInterface"]
+__all__ = ["Web3FinancialTensor", "SovereignAgentLever"]
