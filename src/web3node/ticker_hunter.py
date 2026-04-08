@@ -1,74 +1,67 @@
-# src/web3node/ticker_hunter.py
-import time
+# path: src/web3node/ticker_hunter.py
+import yfinance as yf
 import numpy as np
-from pathlib import Path
 import pandas as pd
+from typing import List
 from src.telemetry import jcllc_monitor
 
-class TickerHunter:
+class Web3TickerHunter:
     """
-    Sovereign Web3Node Ticker Hunter
-    Scans for high Q-Mark signals and moves assets into Yield Farming Range registry.
-    Writes dedicated ledgers on signal events.
+    V338 Sovereign Hunter: Python 3.9 Compatible.
+    Unifies wide-net scanning and historical Data Lake priming.
     """
+    def __init__(self, tickers: List[str], engine):
+        self.tickers = tickers
+        self.engine = engine
 
-    def __init__(self, q_threshold: float = 0.85, yield_farm_window: int = 20):
-        self.q_threshold = q_threshold
-        self.yield_farm_window = yield_farm_window
-        self.yield_farm_registry = []   # Active yield farming candidates
-        self.hunter_ledgers_path = Path("vault/hunter_ledgers")
-        self.hunter_ledgers_path.mkdir(parents=True, exist_ok=True)
-
-    def hunt(self, metrics: dict, tickers: list) -> dict:
-        """Run hunt on latest manifold metrics."""
-        signals = []
-        for i, ticker in enumerate(tickers):
-            q = float(metrics["q_mark"][i])
-            if q > self.q_threshold:
-                signal = {
-                    "ticker": ticker,
-                    "timestamp": time.time(),
-                    "q_mark": q,
-                    "z_score": float(metrics["z_score"][i]),
-                    "spot": float(metrics["spot"][i]),
-                    "liq_align": float(metrics["turtle_alignment"][i]),
-                    "status": "YIELD_FARM_CANDIDATE"
-                }
-                signals.append(signal)
+    def hunt_and_backfill(self, period: str = "60d", interval: str = "1h") -> List[str]:
+        """
+        Ingests 60-day history, ledgers the manifold, and returns 
+        candidates with High-Q superposition.
+        """
+        print(f"[*] INITIATING SOVEREIGN SCAN: {len(self.tickers)} Assets...")
+        high_q_candidates = []
+        
+        try:
+            # Batch download to maximize API efficiency
+            data = yf.download(self.tickers, period=period, interval=interval, group_by='ticker', progress=False)
+            
+            for ticker in self.tickers:
+                # Handle yfinance single-ticker vs multi-ticker dataframe disparity
+                if len(self.tickers) > 1:
+                    t_df = data[ticker].dropna()
+                else:
+                    t_df = data.dropna()
                 
-                # Move to Yield Farming Registry
-                self.yield_farm_registry.append(signal)
-                if len(self.yield_farm_registry) > self.yield_farm_window:
-                    self.yield_farm_registry.pop(0)
+                if len(t_df) < 20: continue 
+                
+                # Format Tensors
+                C = t_df['Close'].values.reshape(1, -1)
+                H = t_df['High'].values.reshape(1, -1)
+                L = t_df['Low'].values.reshape(1, -1)
+                
+                # Inference
+                metrics = self.engine.process_financial_manifold(H, L, C)
+                
+                # Data Lake Priming
+                for t_idx in range(len(t_df)):
+                    jcllc_monitor.ingest_node_state("WEB3_FINANCE", {
+                        "ticker": ticker,
+                        "spot": float(C[0, t_idx]),
+                        "z_score": float(metrics["full_z_history"][0, t_idx]),
+                        "q_mark": float(metrics["q_mark"][0]),
+                        "historical": 1
+                    })
+                
+                # Hunter Logic
+                current_q = metrics["q_mark"][-1]
+                if current_q > 0.70:
+                    high_q_candidates.append(ticker)
+                    print(f"[!] HUNTER_HIT: {ticker} | Q: {current_q:.4f}")
 
-                # Write dedicated hunter ledger
-                self._write_hunter_ledger(signal)
+            print(f"[+] Backfill Complete. Candidates Found: {len(high_q_candidates)}")
+            return high_q_candidates
 
-        # Ingest summary to main telemetry
-        if signals:
-            jcllc_monitor.ingest_node_state("HUNTER_SIGNALS", {
-                "signal_count": len(signals),
-                "tickers": [s["ticker"] for s in signals],
-                "avg_q": np.mean([s["q_mark"] for s in signals])
-            })
-
-        return {
-            "signals": signals,
-            "yield_farm_count": len(self.yield_farm_registry),
-            "yield_farm_tickers": [s["ticker"] for s in self.yield_farm_registry]
-        }
-
-    def _write_hunter_ledger(self, signal: dict):
-        """Write high-signal event to dedicated ledger (CSV + Parquet)."""
-        ts = int(time.time())
-        df = pd.DataFrame([signal])
-        
-        # CSV ledger
-        csv_path = self.hunter_ledgers_path / f"hunter_signal_{ts}.csv"
-        df.to_csv(csv_path, index=False)
-        
-        # Also flush to main telemetry lake
-        jcllc_monitor.flush_to_lake("HUNTER_SIGNALS")
-
-    def get_yield_farm_registry(self):
-        return self.yield_farm_registry
+        except Exception as e:
+            print(f"[ERR] Sovereign Hunt Failed: {e}")
+            return []
