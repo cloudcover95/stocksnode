@@ -11,17 +11,29 @@
 
 ## 📁 Repository Structure
 /Users/nico/Documents/JuniorCloud/stocksnode/
+
 ├── pyproject.toml              # Build matrix and dependencies
+
 ├── run_node.py                 # Simulation ignition
+
 ├── src/
+
 │   ├── telemetry.py            # Lake/Registry logic (IP Protection)
+
 │   ├── web3node/
+
 │   │   ├── __init__.py         # Agent Levers
+
 │   │   ├── financial_tensor.py # SVD/Quantum Math Core
+
 │   │   └── llm_bridge.py       # Sandbox API Injection
+
 │   └── dashboard/
+
 │       └── app.html            # Bento UI (Local Mapping)
+
 └── vault/
+
     └── global_telemetry/       # .parquet Data Lake (ZSTD Compressed)
 
 ## 🚀 Deployment
