@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>JC SDK | Sovereign Omni-Flex V310</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        :root { --bg: #050608; --panel: #0b1219; --border: #1e293b; --neon-g: #00ff88; --neon-b: #3b82f6; --neon-r: #ff4444; }
+        body { background: var(--bg); color: #a0aec0; font-family: 'Consolas', monospace; margin: 0; overflow: hidden; }
+        
+        .hud-grid { display: grid; grid-template-columns: 1.2fr 1.8fr; grid-template-rows: 1fr 1fr; height: 100vh; gap: 4px; padding: 4px; }
+        .tile { background: var(--panel); border: 1px solid var(--border); position: relative; overflow: hidden; }
+        .label { position: absolute; top: 5px; left: 10px; font-size: 0.65em; font-weight: bold; color: var(--neon-b); z-index: 10; letter-spacing: 1px; }
+
+        /* Bento Grid Style for Metrics */
+        .bento-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; padding: 30px 15px 15px; }
+        .bento-card { border: 1px solid var(--border); background: #070b10; padding: 10px; }
+        .bento-ticker { font-size: 0.9em; font-weight: bold; color: #fff; }
+        .bento-val { font-size: 1.2em; margin: 4px 0; }
+        .q-meter { height: 4px; width: 100%; background: #1a202c; position: relative; }
+        .q-fill { height: 100%; position: absolute; left: 0; background: var(--neon-g); transition: 0.4s; }
+
+        /* Terminal Style */
+        #agent-terminal { font-size: 0.75em; padding: 30px 15px; color: var(--neon-g); line-height: 1.4; overflow-y: auto; height: 85%; }
+    </style>
+</head>
+<body>
+
+<div class="hud-grid">
+    <div class="tile">
+        <div class="label">Q1 // SOVEREIGN_MATRIX_TENSOR</div>
+        <div id="bento-matrix" class="bento-container"></div>
+    </div>
+
+    <div class="tile">
+        <div class="label">Q2 // FREEDMAN_DISTANCE_LADDER_3D</div>
+        <div id="topology-plot" style="height:100%"></div>
+    </div>
+
+    <div class="tile">
+        <div class="label">Q3 // AGENT_INFERENCE_SANDBOX</div>
+        <div id="agent-terminal">[*] Awaiting Sovereign Agent Lever...</div>
+    </div>
+
+    <div class="tile">
+        <div class="label">Q4 // SYSTEMIC_COHERENCE_AUDIT</div>
+        <div id="audit-plot" style="height:100%"></div>
+    </div>
+</div>
+
+<script>
+    async function updateHUD() {
+        try {
+            const res = await fetch('http://localhost:8080/api/state');
+            const data = await res.json();
+            if(data.status === "DATA_VOID") return;
+
+            // 1. Render Bento Matrix
+            const bento = document.getElementById('bento-matrix');
+            bento.innerHTML = data.map(x => `
+                <div class="bento-card">
+                    <div class="bento-ticker">${x.ticker}</div>
+                    <div class="bento-val" style="color:${x.z_score > 0 ? 'var(--neon-g)' : 'var(--neon-r)'}">
+                        Z: ${x.z_score.toFixed(2)}
+                    </div>
+                    <div class="q-meter">
+                        <div class="q-fill" style="width:${x.q_mark * 100}%"></div>
+                    </div>
+                    <div style="font-size:0.6em; margin-top:4px;">Q: ${x.q_mark.toFixed(4)}</div>
+                </div>
+            `).join('');
+
+            // 2. Render 3D Topology (FDT)
+            const trace = {
+                x: data.map(x => x.z_score),
+                y: data.map(x => x.liq_align || 0),
+                z: data.map(x => x.q_mark),
+                mode: 'markers+text',
+                text: data.map(x => x.ticker),
+                marker: { size: 10, color: data.map(x => x.q_mark), colorscale: 'Portland' },
+                type: 'scatter3d'
+            };
+            Plotly.react('topology-plot', [trace], {
+                paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+                margin: {t:0,l:0,r:0,b:0},
+                scene: { xaxis: {title:'Z'}, yaxis: {title:'LIQ'}, zaxis: {title:'Q'} }
+            }, {displayModeBar: false});
+
+            // 3. Update Agent Terminal
+            const term = document.getElementById('agent-terminal');
+            const highQ = data.find(x => x.q_mark > 0.85);
+            if(highQ) {
+                term.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ALERT: ${highQ.ticker} Wave Collapse Confirmed (Q:${highQ.q_mark.toFixed(3)})</div>`;
+                term.scrollTop = term.scrollHeight;
+            }
+
+        } catch(e) { console.log("Bridge Offline"); }
+    }
+
+    setInterval(updateHUD, 3000);
+</script>
+</body>
+</html>
