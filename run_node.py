@@ -90,7 +90,65 @@ def real_market_loop():
         except Exception as e:
             print(f"[!] Error in market loop: {e}")
             time.sleep(30)
+# path: /Users/nico/Documents/JuniorCloud/stocksnode/run_node.py
 
+# ... (keep your imports and config the same)
+
+def sovereign_pulse_loop():
+    global active_list
+    print("[⚡] JuniorCloud stocksnode V336: Sovereign Ignition")
+    
+    # 1. Wide-Net Scan & Historical Backfill
+    hunter = Web3TickerHunter(WIDE_NET, engine)
+    active_list = hunter.hunt_and_backfill()
+    
+    if not active_list:
+        active_list = ["BTC-USD", "ETH-USD", "SPY"]
+    
+    print(f"[*] Transitioning to Live Pulse on: {active_list}")
+
+    while True:
+        try:
+            import yfinance as yf
+            # V336 FIX: Always handle as a batch to maintain MultiIndex consistency
+            live_data = yf.download(active_list, period="1d", interval="1m", group_by='ticker', progress=False)
+            
+            for ticker in active_list:
+                # REFINED LOGIC: Always attempt ticker-key access first
+                try:
+                    if len(active_list) > 1 or isinstance(live_data.columns, pd.MultiIndex):
+                        t_df = live_data[ticker].dropna()
+                    else:
+                        t_df = live_data.dropna()
+                except KeyError:
+                    t_df = live_data.dropna()
+
+                if t_df.empty: continue
+                
+                # Format Tensors
+                C = t_df['Close'].values.reshape(1, -1)
+                H = t_df['High'].values.reshape(1, -1)
+                L = t_df['Low'].values.reshape(1, -1)
+                
+                metrics = engine.process_financial_manifold(H, L, C)
+                
+                jcllc_monitor.ingest_node_state("WEB3_FINANCE", {
+                    "ticker": ticker,
+                    "spot": float(metrics["spot"][-1]),
+                    "z_score": float(metrics["z_score"][-1]),
+                    "q_mark": float(metrics["q_mark"][-1]),
+                    "liq_align": float(metrics["turtle_alignment"][-1]),
+                    "historical": 0
+                })
+            
+            print(f"[+] {time.strftime('%H:%M:%S')} | Pulse Recorded | Active: {active_list}")
+            time.sleep(60)
+            
+        except Exception as e:
+            # Output the specific error for audit
+            print(f"[!] Sovereign Pulse Error: {type(e).__name__} - {e}")
+            time.sleep(10)
+            
 if __name__ == "__main__":
     threading.Thread(target=real_market_loop, daemon=True).start()
     uvicorn.run(app, host="0.0.0.0", port=8080, log_level="info")
